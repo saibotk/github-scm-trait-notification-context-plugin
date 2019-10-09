@@ -21,11 +21,15 @@ public class NotificationContextTrait extends SCMSourceTrait {
 
     private String contextLabel;
     private boolean typeSuffix;
+    private boolean sendCustomURL;
+	private String urlLabel;
 
     @DataBoundConstructor
-    public NotificationContextTrait(String contextLabel, boolean typeSuffix) {
+    public NotificationContextTrait(String contextLabel, boolean typeSuffix, boolean sendCustomURL, String urlLabel) {
         this.contextLabel = contextLabel;
         this.typeSuffix = typeSuffix;
+        this.sendCustomURL = sendCustomURL;
+		this.urlLabel = urlLabel;
     }
 
     public String getContextLabel() {
@@ -36,11 +40,17 @@ public class NotificationContextTrait extends SCMSourceTrait {
         return typeSuffix;
     }
 
+    public boolean isSendCustomURL() { return sendCustomURL; }
+
+	public String getUrlLabel() {
+		return urlLabel;
+	}
+
     @Override
     protected void decorateContext(SCMSourceContext<?, ?> context) {
         GitHubSCMSourceContext githubContext = (GitHubSCMSourceContext) context;
         githubContext.withNotificationStrategies(Collections.singletonList(
-                new CustomContextNotificationStrategy(contextLabel, typeSuffix)));
+                new CustomContextNotificationStrategy(contextLabel, typeSuffix, sendCustomURL, urlLabel)));
     }
 
     @Override
@@ -77,10 +87,14 @@ public class NotificationContextTrait extends SCMSourceTrait {
 
         private String contextLabel;
         private boolean typeSuffix;
+        private boolean sendCustomURL;
+		private String urlLabel;
 
-        CustomContextNotificationStrategy(String contextLabel, boolean typeSuffix) {
+        CustomContextNotificationStrategy(String contextLabel, boolean typeSuffix, boolean sendCustomURL, String urlLabel) {
             this.contextLabel = contextLabel;
             this.typeSuffix = typeSuffix;
+            this.sendCustomURL = sendCustomURL;
+			this.urlLabel = urlLabel;
         }
 
         private String buildContext(GitHubNotificationContext notificationContext) {
@@ -98,11 +112,19 @@ public class NotificationContextTrait extends SCMSourceTrait {
             }
             return contextLabel;
         }
+        
+        private String buildURL(GitHubNotificationContext notificationContext, TaskListener listener) {
+            if(sendCustomURL) {
+                return urlLabel;
+            } else {
+                return notificationContext.getDefaultUrl(listener);
+            }
+        }
 
         @Override
         public List<GitHubNotificationRequest> notifications(GitHubNotificationContext notificationContext, TaskListener listener) {
             return Collections.singletonList(GitHubNotificationRequest.build(buildContext(notificationContext),
-                    notificationContext.getDefaultUrl(listener),
+                    buildURL(notificationContext, listener),
                     notificationContext.getDefaultMessage(listener),
                     notificationContext.getDefaultState(listener),
                     notificationContext.getDefaultIgnoreError(listener)));
@@ -114,12 +136,13 @@ public class NotificationContextTrait extends SCMSourceTrait {
             if (o == null || getClass() != o.getClass()) return false;
             CustomContextNotificationStrategy that = (CustomContextNotificationStrategy) o;
             return typeSuffix == that.typeSuffix &&
-                    Objects.equals(contextLabel, that.contextLabel);
+                    Objects.equals(contextLabel, that.contextLabel) &&
+                    Objects.equals(urlLabel, that.urlLabel);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(contextLabel, typeSuffix);
+            return Objects.hash(contextLabel, typeSuffix, urlLabel);
         }
     }
 }
